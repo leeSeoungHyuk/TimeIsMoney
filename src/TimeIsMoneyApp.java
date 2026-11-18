@@ -37,6 +37,7 @@ public class TimeIsMoneyApp extends JFrame {
     private final Path dataDirectory = Paths.get(System.getProperty("user.dir"), "data");
     private final Path expenseFile = dataDirectory.resolve("expenses.csv");
     private final Path incomeFile = dataDirectory.resolve("daily-income.csv");
+    private final Path allowanceFile = dataDirectory.resolve("allowances.csv");
     private final Path configFile = dataDirectory.resolve("settings.properties");
     private final AccountBook accountBook = new AccountBook();
     private final ExpenseTableModel expenseTableModel = new ExpenseTableModel(accountBook);
@@ -46,6 +47,9 @@ public class TimeIsMoneyApp extends JFrame {
     private final JCheckBox[] scheduleEnabled = new JCheckBox[7];
     private final JTextField[] scheduleStart = new JTextField[7];
     private final JTextField[] scheduleEnd = new JTextField[7];
+    private final JCheckBox[] breakEnabled = new JCheckBox[7];
+    private final JTextField[] breakStart = new JTextField[7];
+    private final JTextField[] breakEnd = new JTextField[7];
     private final JCheckBox compareEnabled = new JCheckBox("비교");
     private final JComboBox<String> comparisonProfile = new JComboBox<>(new String[]{
             "대한민국 대통령 (2026)", "대한민국 국회의원 (2026)", "이재용 (삼성전자 급여)", "사용자 정의"
@@ -56,6 +60,8 @@ public class TimeIsMoneyApp extends JFrame {
 
     private final JLabel dayName = new JLabel();
     private final JTextField dailyIncomeInput = new JTextField(10);
+    private final JTextField allowanceInput = new JTextField(10);
+    private final JLabel allowanceHint = new JLabel("용돈·보너스·기타 수입을 날짜별로 추가할 수 있습니다.");
     private final JLabel dailyIncomeHint = new JLabel("직접 입력한 하루 수입은 달력에 저장됩니다.");
     private final JLabel timerIncomeValue = new JLabel("₩0");
     private final JLabel timerElapsedValue = new JLabel("근무 진행률 0%");
@@ -86,6 +92,9 @@ public class TimeIsMoneyApp extends JFrame {
     private final boolean[] savedScheduleEnabled = {true, true, true, true, true, false, false};
     private final String[] savedScheduleStart = {"09:00", "09:00", "09:00", "09:00", "09:00", "09:00", "09:00"};
     private final String[] savedScheduleEnd = {"18:00", "18:00", "18:00", "18:00", "18:00", "18:00", "18:00"};
+    private final boolean[] savedBreakEnabled = {true, true, true, true, true, false, false};
+    private final String[] savedBreakStart = {"12:00", "12:00", "12:00", "12:00", "12:00", "12:00", "12:00"};
+    private final String[] savedBreakEnd = {"13:00", "13:00", "13:00", "13:00", "13:00", "13:00", "13:00"};
 
     public TimeIsMoneyApp() {
         super("TimeIsMoney | 달력 가계부");
@@ -256,7 +265,20 @@ public class TimeIsMoneyApp extends JFrame {
         incomeForm.add(dailyIncomeInput); incomeForm.add(saveIncome); incomeForm.add(clearIncome);
         dailyIncomeHint.setForeground(MUTED); dailyIncomeHint.setFont(new Font("Malgun Gothic", Font.PLAIN, 11));
         incomeBox.add(incomeTitle, BorderLayout.NORTH); incomeBox.add(incomeForm, BorderLayout.CENTER); incomeBox.add(dailyIncomeHint, BorderLayout.SOUTH);
-        details.add(incomeBox, BorderLayout.NORTH);
+        JPanel allowanceBox = new JPanel(new BorderLayout(6, 6)); allowanceBox.setBackground(new Color(240, 253, 250));
+        allowanceBox.setBorder(new EmptyBorder(10, 12, 10, 12));
+        JLabel allowanceTitle = new JLabel("용돈 · 보너스 · 기타 수입"); allowanceTitle.setForeground(new Color(5, 150, 105)); allowanceTitle.setFont(new Font("Malgun Gothic", Font.BOLD, 13));
+        JPanel allowanceForm = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0)); allowanceForm.setOpaque(false);
+        styleInput(allowanceInput);
+        JButton saveAllowance = new JButton("추가"); styleButton(saveAllowance, new Color(5, 150, 105), Color.WHITE); saveAllowance.addActionListener(e -> saveAllowance());
+        JButton clearAllowance = new JButton("지우기"); styleButton(clearAllowance, new Color(248, 250, 252), INK); clearAllowance.addActionListener(e -> clearAllowance());
+        JLabel won = new JLabel("₩"); won.setForeground(INK);
+        allowanceForm.add(won); allowanceForm.add(allowanceInput); allowanceForm.add(saveAllowance); allowanceForm.add(clearAllowance);
+        allowanceHint.setForeground(MUTED); allowanceHint.setFont(new Font("Malgun Gothic", Font.PLAIN, 10));
+        allowanceBox.add(allowanceTitle, BorderLayout.NORTH); allowanceBox.add(allowanceForm, BorderLayout.CENTER); allowanceBox.add(allowanceHint, BorderLayout.SOUTH);
+        JPanel incomeStack = new JPanel(new BorderLayout(0, 8)); incomeStack.setOpaque(false);
+        incomeStack.add(incomeBox, BorderLayout.NORTH); incomeStack.add(allowanceBox, BorderLayout.CENTER);
+        details.add(incomeStack, BorderLayout.NORTH);
 
         JPanel expenses = new JPanel(new BorderLayout(8, 8)); expenses.setOpaque(false);
         JPanel expHeader = new JPanel(new BorderLayout()); expHeader.setOpaque(false);
@@ -352,30 +374,38 @@ public class TimeIsMoneyApp extends JFrame {
         c.gridx = 0; c.gridy = 1; JLabel amountLabel = new JLabel("시급 또는 연봉 (원)"); amountLabel.setForeground(MUTED); form.add(amountLabel, c);
         c.gridx = 1; styleInput(salaryAmount); form.add(salaryAmount, c);
         String[] weekdays = {"월", "화", "수", "목", "금", "토", "일"};
-        c.gridx = 0; c.gridy = 2; c.gridwidth = 4; JLabel scheduleTitle = new JLabel("주간 근무 일정"); scheduleTitle.setForeground(INK); scheduleTitle.setFont(new Font("Malgun Gothic", Font.BOLD, 14)); form.add(scheduleTitle, c);
+        c.gridx = 0; c.gridy = 2; c.gridwidth = 6; JLabel scheduleTitle = new JLabel("주간 근무 일정 (점심시간은 유급 근무시간에서 제외)"); scheduleTitle.setForeground(INK); scheduleTitle.setFont(new Font("Malgun Gothic", Font.BOLD, 14)); form.add(scheduleTitle, c);
         c.gridy = 3; c.gridwidth = 1; c.weightx = 0.2; JLabel dayHeader = new JLabel("요일"); dayHeader.setForeground(MUTED); form.add(dayHeader, c);
         c.gridx = 1; JLabel enabledHeader = new JLabel("근무"); enabledHeader.setForeground(MUTED); form.add(enabledHeader, c);
         c.gridx = 2; JLabel startHeader = new JLabel("시작"); startHeader.setForeground(MUTED); form.add(startHeader, c);
         c.gridx = 3; JLabel endHeader = new JLabel("종료"); endHeader.setForeground(MUTED); form.add(endHeader, c);
+        c.gridx = 4; JLabel breakHeader = new JLabel("점심"); breakHeader.setForeground(MUTED); form.add(breakHeader, c);
+        c.gridx = 5; JLabel breakTimeHeader = new JLabel("점심 시작 ~ 종료"); breakTimeHeader.setForeground(MUTED); form.add(breakTimeHeader, c);
         for (int i = 0; i < 7; i++) {
             final int index = i;
             if (scheduleEnabled[i] == null) { scheduleEnabled[i] = new JCheckBox(); scheduleStart[i] = new JTextField("09:00", 5); scheduleEnd[i] = new JTextField("18:00", 5); }
+            if (breakEnabled[i] == null) { breakEnabled[i] = new JCheckBox(); breakStart[i] = new JTextField("12:00", 5); breakEnd[i] = new JTextField("13:00", 5); }
             scheduleEnabled[i].setOpaque(false); scheduleEnabled[i].setSelected(savedScheduleEnabled[index]);
             scheduleStart[i].setText(savedScheduleStart[index]); scheduleEnd[i].setText(savedScheduleEnd[index]);
+            breakEnabled[i].setOpaque(false); breakEnabled[i].setSelected(savedBreakEnabled[index]);
+            breakStart[i].setText(savedBreakStart[index]); breakEnd[i].setText(savedBreakEnd[index]);
             c.gridy = 4 + i; c.gridx = 0; JLabel day = new JLabel(weekdays[i] + "요일"); day.setForeground(INK); form.add(day, c);
             c.gridx = 1; form.add(scheduleEnabled[i], c);
             c.gridx = 2; styleInput(scheduleStart[i]); form.add(scheduleStart[i], c);
             c.gridx = 3; styleInput(scheduleEnd[i]); form.add(scheduleEnd[i], c);
+            c.gridx = 4; form.add(breakEnabled[i], c);
+            c.gridx = 5; JPanel breakTimes = new JPanel(new FlowLayout(FlowLayout.LEFT, 2, 0)); breakTimes.setOpaque(false);
+            styleInput(breakStart[i]); styleInput(breakEnd[i]); breakTimes.add(breakStart[i]); breakTimes.add(new JLabel("~")); breakTimes.add(breakEnd[i]); form.add(breakTimes, c);
         }
         JLabel note = new JLabel("지난 근무일은 예정 급여로 자동 계산됩니다. 날짜별 입력 금액은 자동 계산보다 우선합니다."); note.setForeground(MUTED);
-        c.gridy = 11; c.gridx = 0; c.gridwidth = 4; form.add(note, c);
+        c.gridy = 11; c.gridx = 0; c.gridwidth = 6; form.add(note, c);
         JButton save = new JButton("저장"); styleButton(save, TEAL, Color.WHITE);
         save.addActionListener(e -> {
             try { userSalary(); validateSchedule(); saveSettings(); refreshAll(); statusValue.setText("급여 및 근무 일정을 저장했습니다."); dialog.dispose(); }
             catch (IllegalArgumentException ex) { warning(ex.getMessage()); }
         });
-        c.gridy = 12; c.gridx = 0; c.gridwidth = 4; c.anchor = GridBagConstraints.EAST; form.add(save, c);
-        dialog.setContentPane(form); dialog.pack(); dialog.setMinimumSize(new Dimension(430, 520)); dialog.setLocationRelativeTo(this); dialog.setVisible(true);
+        c.gridy = 12; c.gridx = 0; c.gridwidth = 6; c.anchor = GridBagConstraints.EAST; form.add(save, c);
+        dialog.setContentPane(form); dialog.pack(); dialog.setMinimumSize(new Dimension(700, 520)); dialog.setLocationRelativeTo(this); dialog.setVisible(true);
     }
 
     private void toggleComparisonDialog() {
@@ -470,14 +500,18 @@ public class TimeIsMoneyApp extends JFrame {
         DailyIncome income = accountBook.incomeFor(selectedDate);
         dailyIncomeInput.setText(income == null ? "" : amountInput(income.amount()));
         dailyIncomeHint.setText(income == null ? "예정 급여가 자동 계산됩니다. 직접 입력하면 해당 날짜 금액으로 저장됩니다." : "저장된 하루 급여가 예정 급여보다 우선 적용 중입니다. 0원도 저장할 수 있어요.");
+        double allowance = accountBook.allowanceFor(selectedDate);
+        allowanceInput.setText(allowance <= 0 ? "" : amountInput(allowance));
+        allowanceHint.setText(allowance <= 0 ? "용돈·보너스·기타 수입을 날짜별로 추가할 수 있습니다." : "이 날짜에 저장된 용돈·기타 수입: " + krw(allowance));
     }
 
     private double incomeForDate(LocalDate date) {
         DailyIncome saved = accountBook.incomeFor(date);
-        if (saved != null) return saved.amount();
-        LocalDate today = LocalDate.now();
-        if (date.isAfter(today)) return scheduledIncome(date, 1.0);
-        return scheduledIncome(date, date.equals(today) ? shiftProgress(date, LocalTime.now()) : 1.0);
+        double base;
+        if (saved != null) base = saved.amount();
+        else if (date.isAfter(LocalDate.now())) base = scheduledIncome(date, 1.0);
+        else base = scheduledIncome(date, date.equals(LocalDate.now()) ? shiftProgress(date, LocalTime.now()) : 1.0);
+        return base + accountBook.allowanceFor(date);
     }
 
     private void refreshDayTable() {
@@ -527,7 +561,7 @@ public class TimeIsMoneyApp extends JFrame {
     private UserSalary userSalary() {
         double amount = positive(salaryAmount.getText(), "급여 금액");
         long weeklySeconds = 0;
-        for (int i = 0; i < 7; i++) if (savedScheduleEnabled[i]) weeklySeconds += Duration.between(LocalTime.parse(savedScheduleStart[i]), LocalTime.parse(savedScheduleEnd[i])).getSeconds();
+        for (int i = 0; i < 7; i++) if (savedScheduleEnabled[i]) weeklySeconds += paidSecondsForIndex(i);
         if (salaryType.getSelectedIndex() == 1 && weeklySeconds == 0) weeklySeconds = 40 * 3600L;
         return new UserSalary(salaryType.getSelectedIndex() == 0, amount, weeklySeconds);
     }
@@ -540,6 +574,22 @@ public class TimeIsMoneyApp extends JFrame {
             statusValue.setText(selectedDate + " 하루 급여를 저장했습니다.");
         } catch (IllegalArgumentException e) { warning(e.getMessage()); }
         catch (IOException e) { warning("하루 급여를 저장하지 못했습니다: " + e.getMessage()); }
+    }
+
+    private void saveAllowance() {
+        try {
+            double amount = nonNegative(allowanceInput.getText(), "용돈·기타 수입");
+            accountBook.setAllowance(selectedDate, amount);
+            persistAllowances(); updateSelectedDay(); refreshAll();
+            statusValue.setText(selectedDate + " 용돈·기타 수입을 저장했습니다.");
+        } catch (IllegalArgumentException e) { warning(e.getMessage()); }
+        catch (IOException e) { warning("용돈·기타 수입을 저장하지 못했습니다: " + e.getMessage()); }
+    }
+
+    private void clearAllowance() {
+        accountBook.removeAllowance(selectedDate);
+        try { persistAllowances(); updateSelectedDay(); refreshAll(); statusValue.setText("선택한 날짜의 용돈·기타 수입을 지웠습니다."); }
+        catch (IOException e) { warning("용돈·기타 수입 파일을 저장하지 못했습니다: " + e.getMessage()); }
     }
 
     private void clearDailyIncome() {
@@ -601,10 +651,16 @@ public class TimeIsMoneyApp extends JFrame {
             savedScheduleEnabled[i] = scheduleEnabled[i].isSelected();
             savedScheduleStart[i] = scheduleStart[i].getText().trim();
             savedScheduleEnd[i] = scheduleEnd[i].getText().trim();
+            savedBreakEnabled[i] = breakEnabled[i].isSelected();
+            savedBreakStart[i] = breakStart[i].getText().trim();
+            savedBreakEnd[i] = breakEnd[i].getText().trim();
             try {
                 LocalTime start = LocalTime.parse(savedScheduleStart[i], TIME_FORMAT);
                 LocalTime end = LocalTime.parse(savedScheduleEnd[i], TIME_FORMAT);
                 if (savedScheduleEnabled[i] && !end.isAfter(start)) throw new IllegalArgumentException(DAY_NAMES[i] + " 종료 시간은 시작 시간보다 늦어야 합니다.");
+                LocalTime lunchStart = LocalTime.parse(savedBreakStart[i], TIME_FORMAT);
+                LocalTime lunchEnd = LocalTime.parse(savedBreakEnd[i], TIME_FORMAT);
+                if (savedBreakEnabled[i] && (!lunchEnd.isAfter(lunchStart) || lunchStart.isBefore(start) || lunchEnd.isAfter(end))) throw new IllegalArgumentException(DAY_NAMES[i] + " 점심시간은 근무시간 안에서 설정하세요.");
             } catch (java.time.DateTimeException ex) { throw new IllegalArgumentException(DAY_NAMES[i] + " 시간을 HH:mm 형식으로 입력하세요. (예: 09:00)"); }
         }
     }
@@ -612,7 +668,7 @@ public class TimeIsMoneyApp extends JFrame {
     private long scheduledSeconds(LocalDate date) {
         int index = date.getDayOfWeek().getValue() - 1;
         if (!savedScheduleEnabled[index]) return 0;
-        return Duration.between(LocalTime.parse(savedScheduleStart[index]), LocalTime.parse(savedScheduleEnd[index])).getSeconds();
+        return paidSecondsForIndex(index);
     }
 
     private double shiftProgress(LocalDate date, LocalTime now) {
@@ -622,7 +678,33 @@ public class TimeIsMoneyApp extends JFrame {
         LocalTime end = LocalTime.parse(savedScheduleEnd[index]);
         if (!now.isAfter(start)) return 0;
         if (!now.isBefore(end)) return 1;
-        return (double) Duration.between(start, now).getSeconds() / Duration.between(start, end).getSeconds();
+        long total = paidSecondsForIndex(index);
+        if (total <= 0) return 0;
+        return (double) paidElapsedSeconds(index, now) / total;
+    }
+
+    private long paidSecondsForIndex(int index) {
+        LocalTime start = LocalTime.parse(savedScheduleStart[index]);
+        LocalTime end = LocalTime.parse(savedScheduleEnd[index]);
+        long total = Duration.between(start, end).getSeconds();
+        if (savedBreakEnabled[index]) total -= breakOverlapSeconds(start, end, LocalTime.parse(savedBreakStart[index]), LocalTime.parse(savedBreakEnd[index]));
+        return Math.max(0, total);
+    }
+
+    private long paidElapsedSeconds(int index, LocalTime now) {
+        LocalTime start = LocalTime.parse(savedScheduleStart[index]);
+        LocalTime end = LocalTime.parse(savedScheduleEnd[index]);
+        LocalTime capped = now.isAfter(end) ? end : now;
+        long elapsed = Math.max(0, Duration.between(start, capped).getSeconds());
+        if (savedBreakEnabled[index]) elapsed -= breakOverlapSeconds(start, capped, LocalTime.parse(savedBreakStart[index]), LocalTime.parse(savedBreakEnd[index]));
+        return Math.max(0, elapsed);
+    }
+
+    private static long breakOverlapSeconds(LocalTime shiftStart, LocalTime shiftEnd, LocalTime breakStart, LocalTime breakEnd) {
+        if (!breakEnd.isAfter(breakStart)) return 0;
+        LocalTime overlapStart = breakStart.isAfter(shiftStart) ? breakStart : shiftStart;
+        LocalTime overlapEnd = breakEnd.isBefore(shiftEnd) ? breakEnd : shiftEnd;
+        return overlapEnd.isAfter(overlapStart) ? Duration.between(overlapStart, overlapEnd).getSeconds() : 0;
     }
 
     private double scheduledIncome(LocalDate date, double progress) {
@@ -643,9 +725,13 @@ public class TimeIsMoneyApp extends JFrame {
         p.setProperty("salary.amount", salaryAmount.getText().trim());
         for (int i = 0; i < 7; i++) {
             if (scheduleEnabled[i] != null) { savedScheduleEnabled[i] = scheduleEnabled[i].isSelected(); savedScheduleStart[i] = scheduleStart[i].getText().trim(); savedScheduleEnd[i] = scheduleEnd[i].getText().trim(); }
+            if (breakEnabled[i] != null) { savedBreakEnabled[i] = breakEnabled[i].isSelected(); savedBreakStart[i] = breakStart[i].getText().trim(); savedBreakEnd[i] = breakEnd[i].getText().trim(); }
             p.setProperty("schedule." + DAY_KEYS[i] + ".enabled", Boolean.toString(savedScheduleEnabled[i]));
             p.setProperty("schedule." + DAY_KEYS[i] + ".start", savedScheduleStart[i]);
             p.setProperty("schedule." + DAY_KEYS[i] + ".end", savedScheduleEnd[i]);
+            p.setProperty("schedule." + DAY_KEYS[i] + ".break.enabled", Boolean.toString(savedBreakEnabled[i]));
+            p.setProperty("schedule." + DAY_KEYS[i] + ".break.start", savedBreakStart[i]);
+            p.setProperty("schedule." + DAY_KEYS[i] + ".break.end", savedBreakEnd[i]);
         }
         p.setProperty("compare.profile", Integer.toString(Math.max(0, comparisonProfile.getSelectedIndex())));
         p.setProperty("compare.name", comparisonName.getText().trim()); p.setProperty("compare.annualIncome", comparisonAnnual.getText().trim());
@@ -663,6 +749,9 @@ public class TimeIsMoneyApp extends JFrame {
                 savedScheduleEnabled[i] = Boolean.parseBoolean(p.getProperty("schedule." + DAY_KEYS[i] + ".enabled", i < 5 ? "true" : "false"));
                 savedScheduleStart[i] = p.getProperty("schedule." + DAY_KEYS[i] + ".start", "09:00");
                 savedScheduleEnd[i] = p.getProperty("schedule." + DAY_KEYS[i] + ".end", "18:00");
+                savedBreakEnabled[i] = Boolean.parseBoolean(p.getProperty("schedule." + DAY_KEYS[i] + ".break.enabled", i < 5 ? "true" : "false"));
+                savedBreakStart[i] = p.getProperty("schedule." + DAY_KEYS[i] + ".break.start", "12:00");
+                savedBreakEnd[i] = p.getProperty("schedule." + DAY_KEYS[i] + ".break.end", "13:00");
             }
             int profile = Integer.parseInt(p.getProperty("compare.profile", "0")); comparisonProfile.setSelectedIndex(Math.max(0, Math.min(3, profile)));
             comparisonName.setText(p.getProperty("compare.name", "대한민국 대통령")); comparisonAnnual.setText(p.getProperty("compare.annualIncome", "271770000"));
@@ -676,11 +765,13 @@ public class TimeIsMoneyApp extends JFrame {
             Files.createDirectories(dataDirectory);
             if (Files.exists(expenseFile)) accountBook.replaceExpenses(CsvStorage.readExpenses(expenseFile));
             if (Files.exists(incomeFile)) accountBook.replaceIncomes(CsvStorage.readIncomes(incomeFile));
+            if (Files.exists(allowanceFile)) accountBook.replaceAllowances(CsvStorage.readAllowances(allowanceFile));
         } catch (IOException e) { statusValue.setText("저장된 기록을 읽지 못했습니다: " + e.getMessage()); }
     }
 
     private void persistExpenses() throws IOException { Files.createDirectories(dataDirectory); CsvStorage.writeExpenses(expenseFile, accountBook.allExpenses()); }
     private void persistIncomes() throws IOException { Files.createDirectories(dataDirectory); CsvStorage.writeIncomes(incomeFile, accountBook.allIncomes()); }
+    private void persistAllowances() throws IOException { Files.createDirectories(dataDirectory); CsvStorage.writeAllowances(allowanceFile, accountBook.allAllowances()); }
 
     private void warning(String message) { JOptionPane.showMessageDialog(this, message, "입력 확인", JOptionPane.WARNING_MESSAGE); }
     private static double positive(String value, String label) { double n = parseNumber(value, label); if (n <= 0) throw new IllegalArgumentException(label + "은(는) 0보다 커야 합니다."); return n; }
@@ -710,6 +801,7 @@ record Expense(LocalDateTime time, String category, double amount, String memo) 
 final class AccountBook {
     private final List<Expense> expenses = new ArrayList<>();
     private final Map<LocalDate, DailyIncome> incomes = new HashMap<>();
+    private final Map<LocalDate, Double> allowances = new HashMap<>();
     void addExpense(Expense e) { expenses.add(e); }
     void removeExpense(Expense e) { expenses.remove(e); }
     List<Expense> allExpenses() { return List.copyOf(expenses); }
@@ -723,8 +815,13 @@ final class AccountBook {
     DailyIncome incomeFor(LocalDate date) { return incomes.get(date); }
     List<DailyIncome> allIncomes() { return incomes.values().stream().sorted(Comparator.comparing(DailyIncome::date)).toList(); }
     List<DailyIncome> incomesIn(YearMonth month) { return incomes.values().stream().filter(i -> YearMonth.from(i.date()).equals(month)).toList(); }
+    void setAllowance(LocalDate date, double amount) { allowances.put(date, amount); }
+    void removeAllowance(LocalDate date) { allowances.remove(date); }
+    double allowanceFor(LocalDate date) { return allowances.getOrDefault(date, 0.0); }
+    Map<LocalDate, Double> allAllowances() { return Map.copyOf(allowances); }
     void replaceExpenses(List<Expense> list) { expenses.clear(); expenses.addAll(list); }
     void replaceIncomes(List<DailyIncome> list) { incomes.clear(); for (DailyIncome i : list) incomes.put(i.date(), i); }
+    void replaceAllowances(Map<LocalDate, Double> values) { allowances.clear(); allowances.putAll(values); }
 }
 
 final class CalendarDayCell extends JPanel {
@@ -828,6 +925,16 @@ final class CsvStorage {
         }
         return result;
     }
+    static Map<LocalDate, Double> readAllowances(Path path) throws IOException {
+        List<String> lines = Files.readAllLines(path, StandardCharsets.UTF_8); Map<LocalDate, Double> result = new HashMap<>();
+        for (int i = 0; i < lines.size(); i++) {
+            if (i == 0 && lines.get(i).startsWith("date,")) continue; if (lines.get(i).isBlank()) continue;
+            List<String> f = parse(lines.get(i));
+            try { result.put(LocalDate.parse(f.get(0)), Double.parseDouble(f.get(1))); }
+            catch (RuntimeException e) { throw new IOException("allowances.csv " + (i + 1) + "번째 줄을 읽을 수 없습니다.", e); }
+        }
+        return result;
+    }
     static void writeExpenses(Path path, List<Expense> all) throws IOException {
         List<String> lines = new ArrayList<>(); lines.add("datetime,category,amount,memo");
         for (Expense e : all) lines.add(csv(e.time().toString()) + "," + csv(e.category()) + "," + number(e.amount()) + "," + csv(e.memo()));
@@ -836,6 +943,11 @@ final class CsvStorage {
     static void writeIncomes(Path path, List<DailyIncome> all) throws IOException {
         List<String> lines = new ArrayList<>(); lines.add("date,amount");
         for (DailyIncome i : all) lines.add(i.date() + "," + number(i.amount()));
+        writeAtomic(path, lines);
+    }
+    static void writeAllowances(Path path, Map<LocalDate, Double> all) throws IOException {
+        List<String> lines = new ArrayList<>(); lines.add("date,amount");
+        all.entrySet().stream().sorted(Map.Entry.comparingByKey()).forEach(e -> lines.add(e.getKey() + "," + number(e.getValue())));
         writeAtomic(path, lines);
     }
     private static String number(double n) { return BigDecimal.valueOf(n).setScale(2, RoundingMode.HALF_UP).stripTrailingZeros().toPlainString(); }
